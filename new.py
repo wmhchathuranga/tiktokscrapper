@@ -131,6 +131,7 @@ def scrapper(href):
     	File Name : {video_file_name}
 
     	''')
+    download(res["token"], video_file_name)
     return video
 
 
@@ -151,14 +152,16 @@ def dbCommit(video):
     handler.execute(sql_query)
     connector.commit()
 
+
+def download(token, video_filename):
     # Downlaod Video
 
-    # download_url = "https://pride.nowmvideo.com/download/" + \
-    #     token + "/" + video_id + ".mp4"
+    download_url = "https://pride.nowmvideo.com/download/" + \
+        token + "/" + video_filename
     # cmd_wget = "wget "+download_url
-    # cmd_certutil = "certutil.exe -urlcache -f "+download_url + " "+video_file_name
-    # os.system(cmd_certutil)
-    # time.sleep(10)
+    cmd_certutil = "certutil.exe -urlcache -f "+download_url + " "+video_filename
+    os.system(cmd_certutil)
+    time.sleep(10)
 
 
 request = Request()
