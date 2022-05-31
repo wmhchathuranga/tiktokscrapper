@@ -1,11 +1,13 @@
-from ast import Constant
-from multiprocessing import connection
 import requests
 import os
 import mysql.connector
 from bs4 import BeautifulSoup
 import time
-import random
+
+
+class configs:
+    download = False
+    os = "windows"
 
 
 class Database:
@@ -39,15 +41,6 @@ class Video:
         self.video_description = video_description
 
 
-class Proxy:
-    file1 = open('proxy.txt', 'r')
-    proxy_list = file1.read().split()
-
-    def getRandomProxy(self):
-        random_proxy = self.proxy_list[random.randrange(len(self.proxy_list))]
-        return random_proxy
-
-
 class Request:
 
     base_url = "https://www.tiktok.com"
@@ -58,28 +51,28 @@ class Request:
     headers = {"Connection": "close", "Cache-Control": "max-age=0", "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"98\", \"Google Chrome\";v=\"98\"", "sec-ch-ua-mobile": "?0", "sec-ch-ua-platform": "\"Windows\"", "Upgrade-Insecure-Requests": "1",
                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.82 Safari/537.36", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9", "Sec-Fetch-Site": "none", "Sec-Fetch-Mode": "navigate", "Sec-Fetch-User": "?1", "Sec-Fetch-Dest": "document", "Accept-Encoding": "gzip, deflate", "Accept-Language": "en-US,en;q=0.9"}
 
-    def getSoup(self, proxy, url):
+    def getSoup(self, url):
         try:
             res = requests.get(url, headers=self.headers,
                                cookies=self.cookies, timeout=5)
             soup = BeautifulSoup(res.text, 'html.parser')
         except:
             time.sleep(15)
-            self.getSoup(self, proxy, url)
+            self.getSoup(url)
         return soup
 
 
-def getProfile(proxy):
+def getProfile():
 
-    page = request.getSoup(proxy, request.foryou_url)
+    page = request.getSoup(request.foryou_url)
     uname = page.find('a', attrs={"data-e2e": "video-author-avatar"})
     uname = uname['href']
     return request.base_url + uname
 
 
-def getVideoLink(profile_link, proxy):
+def getVideoLink(profile_link):
 
-    page = request.getSoup(proxy, profile_link)
+    page = request.getSoup(profile_link)
     div = page.find('div', attrs={"data-e2e": "user-post-item"})
     video_link = div.find('a')
     return video_link['href']
@@ -131,7 +124,7 @@ def scrapper(href):
     	File Name : {video_file_name}
 
     	''')
-    download(res["token"], video_file_name)
+    # download(res["token"], video_file_name)
     return video
 
 
@@ -165,29 +158,22 @@ def download(token, video_filename):
 
 
 request = Request()
-proxyManager = Proxy()
-proxy = proxyManager.getRandomProxy()
-print(proxy)
 
 
-def run(proxy):
+def run():
     while True:
         try:
-            profile_link = getProfile(proxy)
+            profile_link = getProfile()
             print(profile_link)
-            video_link = getVideoLink(profile_link, proxy)
+            video_link = getVideoLink(profile_link)
             print(video_link)
             video = scrapper(video_link)
             dbCommit(video)
         except Exception as err:
             print(err)
-            proxyManager = Proxy()
-            proxy = proxyManager.getRandomProxy()
-            print(proxy)
             # print("Duplicate Video Skipped")
             pass
         time.sleep(5)
-    # run()
 
 
-run(proxy)
+run()
