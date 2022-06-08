@@ -1,4 +1,3 @@
-from cgitb import handler
 import requests
 import os
 import mysql.connector
@@ -17,6 +16,14 @@ class Database:
     PASSWD = ""
     DATABASE = "tiktokvideos"
     TABLE = "videos"
+
+
+class Database2:
+    HOST = "localhost"
+    USER = "root"
+    PASSWD = ""
+    DATABASE = "tiktokusers"
+    TABLE = "users"
 
 
 class Video:
@@ -64,11 +71,13 @@ class Request:
 
 
 def getProfile():
-
-    page = request.getSoup(request.foryou_url)
-    uname = page.find('a', attrs={"data-e2e": "video-author-avatar"})
-    uname = uname['href']
-    return request.base_url + uname
+    profiles = []
+    handler2.execute(f"SELECT profile from {db2.TABLE} where scrapped = 0")
+    list = handler2.fetchall()
+    for link in list:
+        if link[0] not in profiles:
+            profiles.append(link[0])
+    return profiles
 
 
 def getVideoLink(profile_link):
@@ -133,23 +142,17 @@ def scrapper(href):
 
 def dbCommit(video):
 
-    handler = connector.cursor()
-
-    # sql_query = f"SELECT id FROM {db.TABLE} ORDER BY 1 DESC LIMIT 1"
-    # handler.execute(sql_query)
-    # try:
-    #     id = handler.lastrowid + 1
-    # except:
-    #     id = 1
-    sql_query = f"INSERT INTO {db.TABLE} (author_name,author_id,video_id,video_url,description,comments,likes,shares,filename) VALUES ('{video.author_name}','{video.author_id}','{video.video_id}','{video.video_url}','{video.video_description}',{video.video_comment_count}, {video.video_like_count}, {video.video_share_count}, '{video.video_file_name}')"
-
+    sql_query = f"SELECT id FROM {db.TABLE} order by 1"
+    handler.execute(sql_query)
     try:
-        handler.execute(sql_query)
-        connector.commit()
-        handler.close()
-    except Exception as err:
-        print(err)
-        handler.close()
+        id = handler.fetchall()[-1][0] + 1
+    except:
+        id = 1
+    sql_query = f"INSERT INTO {db.TABLE} (id,author_name,author_id,video_id,video_url,description,comments,likes,shares,filename) VALUES ({id},'{video.author_name}','{video.author_id}','{video.video_id}','{video.video_url}','{video.video_description}',{video.video_comment_count}, {video.video_like_count}, {video.video_share_count}, '{video.video_file_name}')"
+    print(id)
+
+    handler.execute(sql_query)
+    connector.commit()
 
 
 def download(token, video_filename):
@@ -167,21 +170,26 @@ request = Request()
 db = Database()
 connector = mysql.connector.connect(
     host=db.HOST, user=db.USER, passwd=db.PASSWD, database=db.DATABASE)
+handler = connector.cursor()
+
+db2 = Database2()
+connector2 = mysql.connector.connect(
+    host=db2.HOST, user=db2.USER, passwd=db2.PASSWD, database=db2.DATABASE)
+handler2 = connector2.cursor()
 
 
 def run():
     while True:
         try:
-            profile_link = getProfile()
-            print("Next profile : "+profile_link)
-            video_links = getVideoLink(profile_link)
-            for link in video_links:
-                print(link)
-                video = scrapper(link)
-                dbCommit(video)
+            profile_links = getProfile()
+            for profile_link in profile_links:
+                video_links = getVideoLink(profile_link)
+                for link in video_links:
+                    print(link)
+                    video = scrapper(link)
+                    dbCommit(video)
         except Exception as err:
             print(err)
-            # handler.close()
             # print("Duplicate Video Skipped..")
             pass
         # time.sleep(5)
