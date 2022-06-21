@@ -1,8 +1,13 @@
+from cgitb import handler
 import requests
 import os
 import mysql.connector
 from bs4 import BeautifulSoup
-import time
+from moviepy.editor import *
+import math
+
+
+video_1 = VideoFileClip("endvideo.mp4")
 
 
 class configs:
@@ -57,7 +62,7 @@ class Request:
                                cookies=self.cookies, timeout=5)
             soup = BeautifulSoup(res.text, 'html.parser')
         except:
-            time.sleep(15)
+            # time.sleep(15)
             self.getSoup(url)
         return soup
 
@@ -71,11 +76,13 @@ def getProfile():
 
 
 def getVideoLink(profile_link):
-
+    videos = []
     page = request.getSoup(profile_link)
-    div = page.find('div', attrs={"data-e2e": "user-post-item"})
-    video_link = div.find('a')
-    return video_link['href']
+    div = page.findAll('div', attrs={"data-e2e": "user-post-item"})
+    for i in div:
+        video_link = i.find('a')
+        videos.append(video_link['href'])
+    return videos
 
 
 def scrapper(href):
@@ -125,25 +132,30 @@ def scrapper(href):
 
     	''')
     # download(res["token"], video_file_name)
-    return video
+    dbCommit(video, res["token"])
 
 
-def dbCommit(video):
-    db = Database()
-    connector = mysql.connector.connect(
-        host=db.HOST, user=db.USER, passwd=db.PASSWD, database=db.DATABASE)
+def dbCommit(video, token):
+
     handler = connector.cursor()
-    sql_query = f"SELECT id FROM {db.TABLE} order by 1"
-    handler.execute(sql_query)
-    try:
-        id = handler.fetchall()[-1][0] + 1
-    except:
-        id = 1
-    sql_query = f"INSERT INTO {db.TABLE} (id,author_name,author_id,video_id,video_url,description,comments,likes,shares,filename) VALUES ({id},'{video.author_name}','{video.author_id}','{video.video_id}','{video.video_url}','{video.video_description}',{video.video_comment_count}, {video.video_like_count}, {video.video_share_count}, '{video.video_file_name}')"
-    print(id)
 
-    handler.execute(sql_query)
-    connector.commit()
+    # sql_query = f"SELECT id FROM {db.TABLE} ORDER BY 1 DESC LIMIT 1"
+    # handler.execute(sql_query)
+    # try:
+    #     id = handler.lastrowid + 1
+    # except:
+    #     id = 1
+    sql_query = f"INSERT INTO {db.TABLE} (author_name,author_id,video_id,video_url,description,comments,likes,shares,filename) VALUES ('{video.author_name}','{video.author_id}','{video.video_id}','{video.video_url}','{video.video_description}',{video.video_comment_count}, {video.video_like_count}, {video.video_share_count}, '{video.video_file_name}')"
+
+    try:
+        download(token, video.video_file_name)
+        handler.execute(sql_query)
+        connector.commit()
+        handler.close()
+    except Exception as err:
+        print(err)
+        handler.close()
+        pass
 
 
 def download(token, video_filename):
@@ -154,26 +166,41 @@ def download(token, video_filename):
     # cmd_wget = "wget "+download_url
     cmd_certutil = "certutil.exe -urlcache -f "+download_url + " "+video_filename
     os.system(cmd_certutil)
-    time.sleep(10)
+    video_2 = VideoFileClip(video_filename)
+    video_3 = video_2.subclip(0, math.floor(video_1.duration)*0.8)
+    final1 = video_3.resize((1080, 1920))
+    final2 = video_1.resize((1080, 1920))
+    finalVideo = concatenate_videoclips([final1, final2])
+    finalVideo.write_videofile(
+        'final2.mp4', threads=20, fps=60, bitrate="2500k")
+
+    # time.sleep(10)
 
 
 request = Request()
+db = Database()
+connector = mysql.connector.connect(
+    host=db.HOST, user=db.USER, passwd=db.PASSWD, database=db.DATABASE)
 
 
 def run():
     while True:
         try:
             profile_link = getProfile()
-            print(profile_link)
-            video_link = getVideoLink(profile_link)
-            print(video_link)
-            video = scrapper(video_link)
-            dbCommit(video)
+            print("Next profile : "+profile_link)
+            video_links = getVideoLink(profile_link)
+            print(video_links)
+            for link in video_links:
+                print(link)
+                scrapper(link)
+                # video = scrapper(link)
+                # dbCommit(video)
         except Exception as err:
             print(err)
-            # print("Duplicate Video Skipped")
+            # handler.close()
+            # print("Duplicate Video Skipped..")
             pass
-        time.sleep(5)
+        # time.sleep(5)
 
 
 run()
